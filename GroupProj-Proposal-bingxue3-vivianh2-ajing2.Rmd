@@ -1,0 +1,58 @@
+---
+title: "Group Project Proposal - Predicting Insurance Price"
+author: "STAT 420, Summer 2019 - Bingxue An (bingxue3); Vivian Hu (vivianh2); Andong Jing (ajing2)"
+date: 'July-17th 2019'
+output:
+  html_document: 
+    toc: yes
+  pdf_document: default
+---
+
+```{r setup, echo = FALSE, message = FALSE, warning = FALSE}
+options(scipen = 1, digits = 4, width = 80)
+```
+  
+## Introduction on dataset
+
+### Background
+The Medical Cost Personal Datasets is a dataset provided by Brett Lantz (2015) in his book *Machine Learning with R*. The data was made available on [Kaggle](https://www.kaggle.com/) for public analysis by Miri Choi (2018).
+  
+###Description of the Dataset
+There are totally 1337 observations of insurance data, and for each of the observation, the dataset includes the following variables:
+
+- `Charges`: Individual medical costs billed by health insurance (numeric) - **response**
+- `Sex`: Insurance contractor gender: (factor)
+    - `female`
+    - `male`
+- `Region`: The beneficiary's residential area in the US: (factor)
+    - `northeast`
+    - `southeast`
+    - `northwest`
+    - `southwest`
+- `Smoker`: The beneficiary's smoking status: (factor)
+    - `yes`
+    - `no`
+- `bmi`: Body mass index, providing an understanding of body, weights that are relatively high or low relative to height, objective index of body weight (kg / m ^ 2) using the ratio of height to weight, ideally 18.5 to 24.9 (numeric)
+- `children`: Number of children covered by health insurance / Number of dependents (numeric)
+- `age`: Age of primary beneficiary
+
+### Links and Citation:
+The dataset ("`insurance.csv`") is available on [Kaggle](https://www.kaggle.com/). It can be downloaded by going to [Medical Cost Personal Datasets](https://www.kaggle.com/mirichoi0218/insurance) page.
+
+Citation:
+Lantz, B. (2015). Machine learning with R. Packt Publishing Ltd.
+Choi, M. (2018). Medical Cost Personal Datasets.
+
+## Statement of Interest
+Once upon a time, insurance agents were like local doctors - they need to know individuals and communities inside-out to give the right price. However, To match that level of knowledge in the age of decentralization and the internet, the insurance industry is turning to big data. By applying data analysis technique on insurance data, we can help the agents to give the right price to the customers more accurately. This will have an impact on the company's bottom line. As Sarah Adams points out:
+  
+“If risk-based capital can be calculated more accurately, this influences the minimum amount of capital that needs to be held.”
+  
+All of the members in our group are very interested in dealing with the data in healthcare area and hope that we can develop a great model to predict insurance costs accurately.
+
+## Data Example:
+Here are the first 10 observations of our dataset:
+```{r}
+insuranceData = read.csv("insurance.csv")
+head(insuranceData, 10)
+```

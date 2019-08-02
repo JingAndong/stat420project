@@ -1,0 +1,127 @@
+---
+title: "Group Project - Predicting Insurance Price"
+author: "STAT 420, Summer 2019 - Bingxue An (bingxue3); Vivian Hu (vivianh2); Andong Jing (ajing2)"
+date: 'July-17th 2019'
+output:
+  html_document: 
+    toc: yes
+  pdf_document: default
+---
+
+```{r setup, echo = FALSE, message = FALSE, warning = FALSE}
+options(scipen = 1, digits = 4, width = 80)
+```
+  
+## Introduction
+
+### Background
+The Medical Cost Personal Datasets is a dataset provided by Brett Lantz (2015) in his book *Machine Learning with R*. The data was made available on [Kaggle](https://www.kaggle.com/) for public analysis by Miri Choi (2018). In this project, a multiple linear regression model will be developed by selecting the best of them from several different models. The model will be used in making predictions about the insurance prices using rest of the variables.
+  
+###Description of the Dataset
+There are totally 1337 observations of insurance data, and for each of the observation, the dataset includes the following variables:
+
+- `Charges`: Individual medical costs billed by health insurance (numeric) - **response**
+- `Sex`: Insurance contractor gender: (factor)
+    - `female`
+    - `male`
+- `Region`: The beneficiary's residential area in the US: (factor)
+    - `northeast`
+    - `southeast`
+    - `northwest`
+    - `southwest`
+- `Smoker`: The beneficiary's smoking status: (factor)
+    - `yes`
+    - `no`
+- `bmi`: Body mass index, providing an understanding of body, weights that are relatively high or low relative to height, objective index of body weight (kg / m ^ 2) using the ratio of height to weight, ideally 18.5 to 24.9 (numeric)
+- `children`: Number of children covered by health insurance / Number of dependents (numeric)
+- `age`: Age of primary beneficiary
+
+Here are the first 5 observations of the dataset:
+```{r}
+insuranceData = read.csv("insurance.csv")
+head(insuranceData, 5)
+```
+
+
+### Links and Citation:
+The dataset ("`insurance.csv`") is available on [Kaggle](https://www.kaggle.com/). It can be downloaded by going to [Medical Cost Personal Datasets](https://www.kaggle.com/mirichoi0218/insurance) page.
+
+Citation:
+Lantz, B. (2015). Machine learning with R. Packt Publishing Ltd.
+Choi, M. (2018). Medical Cost Personal Datasets.
+
+## Methods
+
+### Data Visualization:
+To better develop our model, we would like to have a overall view of the dataset and a visualization of the dataset would be performed.
+```{r}
+insuranceData = read.csv("insurance.csv")
+par(mfrow = c(1,3))
+plot(charges ~ age, data = insuranceData, pch = 20, col = "dodgerblue",main = "Charges vs. Age", cex = 1.5)
+plot(charges ~ sex, data = insuranceData, pch = 20, col = "dodgerblue",main = "Charges vs. sex", cex = 1.5)
+plot(charges ~ bmi, data = insuranceData, pch = 20, col = "dodgerblue",main = "Charges vs. bmi", cex = 1.5)
+par(mfrow = c(1,3))
+plot(charges ~ children, data = insuranceData, pch = 20, col = "dodgerblue",main = "Charges vs. children", cex = 1.5)
+plot(charges ~ smoker, data = insuranceData, pch = 20, col = "dodgerblue",main = "Charges vs. smoker", cex = 1.5)
+plot(charges ~ region, data = insuranceData, pch = 20, col = "dodgerblue",main = "Charges vs. region", cex = 1.5)
+```
+As we can see, there's a very obvious linear relationship between age and the charges. The variable "smoker" would also be very useful since the subject who are smokers are charged much more than those who are not. The relationship between charge and the rest of the variables are not obvious. 
+  
+### Data Preprocessing
+Before we start developing the model, we need to clean the data.
+```{r}
+insuranceData = read.csv("insurance.csv")
+# We want to remove all those rows with missing data
+insuranceData = na.omit(insuranceData)
+# We would like to consider sex,smoker and region as factor variable
+if(is.factor(insuranceData$sex)==FALSE)
+  insuranceData$sex = as.factor(insuranceData$sex)
+if(is.factor(insuranceData$smoker)==FALSE)
+  insuranceData$smoker = as.factor(insuranceData$smoker)
+if(is.factor(insuranceData$region)==FALSE)
+  insuranceData$region = as.factor(insuranceData$region)
+```
+  
+In order to test how well our models work, we would like to splot the data into 'train' and 'test' sets, and develop the models on 'train' while test our models on 'test'.
+
+```{r}
+# 80% of the data will be used for training and the rest for testing
+trainIndex = sample(1:nrow(insuranceData),round(nrow(insuranceData) * 0.80, 0))
+trainSet = insuranceData[trainIndex,]
+testSet = insuranceData[-trainIndex,]
+```
+  
+### Helper functions
+Before we start to build our model, we want to define some helper functions to make our job easier.
+```{r}
+calc_loocv_rmse = function(model) { 
+  sqrt(mean((resid(model) / (1 - hatvalues(model))) ^ 2))
+}
+
+aic = function(model){
+  step(model, direction = "backward",trace = 0)
+}
+
+bic = function(model){
+  step(model, direction = "backward", trace = 0, k = log(length(resid(model))))
+}
+
+# output results in a table
+table = function(aic, bic) {
+  results = data.frame(
+    method = c("`AIC model`", "`BIC model`"),
+    loocv  = c(get_loocv_rmse(aic), get_loocv_rmse(bic)), 
+    params = c(length(coef(aic)), length(coef(bic)))
+  )
+  colnames(results) = c("", "LOOCV", "Number of Parameters")
+  knitr::kable(results)
+}
+```
+
+### Develop of the model
+  
+First we start with a full additive model as a baseline.
+```{r}
+full_additive = lm(charges~., data = insuranceData)
+
+```
