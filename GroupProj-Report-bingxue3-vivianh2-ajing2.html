@@ -288,8 +288,7 @@ head(insuranceData, 5)</code></pre>
 <div id="exploratory-data-analysis" class="section level3">
 <h3>Exploratory Data Analysis</h3>
 <p>To better develop our model, we would like to have an overall view of the dataset and a visualization of the dataset would be performed.</p>
-<pre class="r"><code>insuranceData = read.csv(&quot;insurance.csv&quot;)
-summary(insuranceData)</code></pre>
+<pre class="r"><code>summary(insuranceData)</code></pre>
 <pre><code>##       age           sex           bmi          children    smoker    
 ##  Min.   :18.0   female:662   Min.   :16.0   Min.   :0.00   no :1064  
 ##  1st Qu.:27.0   male  :676   1st Qu.:26.3   1st Qu.:0.00   yes: 274  
@@ -319,8 +318,7 @@ plot(charges ~ region, data = insuranceData, pch = 20, col = &quot;dodgerblue&qu
 <div id="data-preprocessing" class="section level3">
 <h3>Data Preprocessing</h3>
 <p>Before we start developing the model, we need to clean the data.</p>
-<pre class="r"><code>insuranceData = read.csv(&quot;insurance.csv&quot;)
-# We want to remove all those rows with missing data
+<pre class="r"><code># We want to remove all those rows with missing data
 insuranceData = na.omit(insuranceData)
 # We would like to consider sex,smoker and region as factor variable
 if(is.factor(insuranceData$sex)==FALSE) 
@@ -334,6 +332,7 @@ if(is.factor(insuranceData$region)==FALSE)
 <h3>Split Train and Test Data</h3>
 <p>In order to test how well our models work, we would like to splot the data into <code>train</code> and <code>test</code> sets, and develop the models on <code>train</code> while test our models on <code>test</code>.</p>
 <pre class="r"><code># 80% of the data will be used for training and the rest for testing
+set.seed(420)
 trainIndex = sample(1:nrow(insuranceData),round(nrow(insuranceData) * 0.80, 0))
 trainSet = insuranceData[trainIndex,]
 testSet = insuranceData[-trainIndex,]</code></pre>
@@ -369,32 +368,58 @@ table = function(aic, bic) {
 <div id="additive-model" class="section level4">
 <h4>Additive Model</h4>
 <p>First we start with a full additive model as a baseline.</p>
-<pre class="r"><code>full_additive = lm(charges~., data = insuranceData)</code></pre>
+<pre class="r"><code>full_additive = lm(charges~., data = trainSet)
+summary(full_additive)</code></pre>
+<pre><code>## 
+## Call:
+## lm(formula = charges ~ ., data = trainSet)
+## 
+## Residuals:
+##    Min     1Q Median     3Q    Max 
+## -11250  -2838   -978   1310  30173 
+## 
+## Coefficients:
+##                 Estimate Std. Error t value Pr(&gt;|t|)    
+## (Intercept)     -12081.0     1117.0  -10.82   &lt;2e-16 ***
+## age                252.2       13.5   18.68   &lt;2e-16 ***
+## sexmale            102.9      376.4    0.27   0.7847    
+## bmi                341.8       32.3   10.58   &lt;2e-16 ***
+## children           460.6      155.6    2.96   0.0031 ** 
+## smokeryes        23785.1      467.0   50.94   &lt;2e-16 ***
+## regionnorthwest    208.4      539.7    0.39   0.6995    
+## regionsoutheast  -1112.9      544.0   -2.05   0.0410 *  
+## regionsouthwest   -917.1      541.6   -1.69   0.0907 .  
+## ---
+## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
+## 
+## Residual standard error: 6120 on 1061 degrees of freedom
+## Multiple R-squared:  0.745,  Adjusted R-squared:  0.743 
+## F-statistic:  386 on 8 and 1061 DF,  p-value: &lt;2e-16</code></pre>
 <p>Then, we do the BP test and the shapiro test for this model. We find that the p-values for both tests are very close to zero, and thus, the constant variance assumption and the normality assumption for this model are violated.</p>
 <pre class="r"><code>library(lmtest)
 bptest(full_additive)$p.value</code></pre>
 <pre><code>##        BP 
-## 1.447e-22</code></pre>
+## 2.057e-18</code></pre>
 <pre class="r"><code>shapiro.test(resid(full_additive))$p.value</code></pre>
-<pre><code>## [1] 8.385e-29</code></pre>
+<pre><code>## [1] 2.447e-26</code></pre>
 <p>The following observations are those we believe influential (have Cook’s Distance is greater than 4/n, where n is the total number of observations).</p>
-<pre class="r"><code>sum(cooks.distance(full_additive) &gt; 4 / length(cooks.distance(full_additive)))</code></pre>
-<pre><code>## [1] 87</code></pre>
+<pre class="r"><code>(num_influential = sum(cooks.distance(full_additive) &gt; 4 / length(cooks.distance(full_additive))))</code></pre>
+<pre><code>## [1] 64</code></pre>
 <pre class="r"><code>full_add_influential_table = knitr::kable(insuranceData[cooks.distance(full_additive) &gt; 4 / length(cooks.distance(full_additive)),]) 
 head(full_add_influential_table, 10)</code></pre>
 <pre><code>##  [1] &quot;        age  sex         bmi   children  smoker   region       charges&quot;
 ##  [2] &quot;-----  ----  -------  ------  ---------  -------  ----------  --------&quot;
-##  [3] &quot;4        33  male      22.70          0  no       northwest      21984&quot;
-##  [4] &quot;10       60  female    25.84          0  no       northwest      28923&quot;
-##  [5] &quot;35       28  male      36.40          1  yes      southwest      51195&quot;
-##  [6] &quot;63       64  male      24.70          1  no       northwest      30167&quot;
-##  [7] &quot;70       28  male      23.98          3  yes      southeast      17663&quot;
-##  [8] &quot;99       56  male      19.95          0  yes      northeast      22413&quot;
-##  [9] &quot;100      38  male      19.30          0  yes      southwest      15821&quot;
-## [10] &quot;103      18  female    30.11          0  no       northeast      21345&quot;</code></pre>
-<p>There are 1337 observations and 87 of which are influential. The rate is 6.5071%.</p>
+##  [3] &quot;35       28  male      36.40          1  yes      southwest      51195&quot;
+##  [4] &quot;51       18  female    35.62          0  no       northeast       2211&quot;
+##  [5] &quot;58       18  male      31.68          2  yes      southeast      34303&quot;
+##  [6] &quot;68       40  male      26.32          1  no       northwest       6389&quot;
+##  [7] &quot;129      32  female    17.77          2  yes      northwest      32734&quot;
+##  [8] &quot;135      20  female    28.79          0  no       northeast       2457&quot;
+##  [9] &quot;137      19  male      34.10          0  no       southwest       1261&quot;
+## [10] &quot;148      51  female    37.73          1  no       southeast       9878&quot;</code></pre>
+<p>There are 1337 observations and 64 of which are influential. The rate is 4.7868%.</p>
 <pre class="r"><code>cooksD = cooks.distance(full_additive)
-full_additive_2 = lm(charges~., data = insuranceData, subset = cooksD &lt;= 4 / length(cooksD))
+full_additive_2 = lm(charges~., data = trainSet, subset = cooksD &lt;= 4 / length(cooksD))
 
 results = data.frame(coef(full_additive), coef(full_additive_2))
 colnames(results) = c(&quot;With Influential Pts&quot;, &quot;Without Influential Pts&quot;)
@@ -410,48 +435,48 @@ knitr::kable(results)</code></pre>
 <tbody>
 <tr class="odd">
 <td>(Intercept)</td>
-<td align="right">-11938.5</td>
-<td align="right">-11053.560</td>
+<td align="right">-12081.0</td>
+<td align="right">-11930.6</td>
 </tr>
 <tr class="even">
 <td>age</td>
-<td align="right">256.9</td>
-<td align="right">252.741</td>
+<td align="right">252.2</td>
+<td align="right">247.1</td>
 </tr>
 <tr class="odd">
 <td>sexmale</td>
-<td align="right">-131.3</td>
-<td align="right">-1.316</td>
+<td align="right">102.9</td>
+<td align="right">232.6</td>
 </tr>
 <tr class="even">
 <td>bmi</td>
-<td align="right">339.2</td>
-<td align="right">289.247</td>
+<td align="right">341.8</td>
+<td align="right">316.3</td>
 </tr>
 <tr class="odd">
 <td>children</td>
-<td align="right">475.5</td>
-<td align="right">518.667</td>
+<td align="right">460.6</td>
+<td align="right">514.4</td>
 </tr>
 <tr class="even">
 <td>smokeryes</td>
-<td align="right">23848.5</td>
-<td align="right">24796.028</td>
+<td align="right">23785.1</td>
+<td align="right">24492.2</td>
 </tr>
 <tr class="odd">
 <td>regionnorthwest</td>
-<td align="right">-353.0</td>
-<td align="right">-913.176</td>
+<td align="right">208.4</td>
+<td align="right">-340.1</td>
 </tr>
 <tr class="even">
 <td>regionsoutheast</td>
-<td align="right">-1035.0</td>
-<td align="right">-1054.601</td>
+<td align="right">-1112.9</td>
+<td align="right">-1254.4</td>
 </tr>
 <tr class="odd">
 <td>regionsouthwest</td>
-<td align="right">-960.1</td>
-<td align="right">-1032.384</td>
+<td align="right">-917.1</td>
+<td align="right">-840.1</td>
 </tr>
 </tbody>
 </table>
@@ -460,69 +485,190 @@ knitr::kable(results)</code></pre>
 <div id="interaction-model" class="section level4">
 <h4>Interaction Model</h4>
 <p>First we start with a full interaction model as a baseline.</p>
-<pre class="r"><code>full_interaction = lm(charges~.^2, data = insuranceData)</code></pre>
+<pre class="r"><code>full_interaction = lm(charges~.^2, data = trainSet)
+summary(full_interaction)</code></pre>
+<pre><code>## 
+## Call:
+## lm(formula = charges ~ .^2, data = trainSet)
+## 
+## Residuals:
+##    Min     1Q Median     3Q    Max 
+## -10597  -1987  -1217   -161  30265 
+## 
+## Coefficients:
+##                            Estimate Std. Error t value Pr(&gt;|t|)    
+## (Intercept)                -1731.87    2906.39   -0.60  0.55138    
+## age                          209.37      59.76    3.50  0.00048 ***
+## sexmale                    -1824.86    1774.27   -1.03  0.30395    
+## bmi                           22.29      93.99    0.24  0.81256    
+## children                    1207.88     770.23    1.57  0.11714    
+## smokeryes                 -22415.49    2172.00  -10.32  &lt; 2e-16 ***
+## regionnorthwest            -1095.43    2548.90   -0.43  0.66746    
+## regionsoutheast             2845.24    2455.08    1.16  0.24676    
+## regionsouthwest              475.00    2440.58    0.19  0.84572    
+## age:sexmale                   28.56      21.63    1.32  0.18695    
+## age:bmi                        1.15       1.83    0.63  0.52990    
+## age:children                  -9.27       9.77   -0.95  0.34295    
+## age:smokeryes                 -4.61      26.95   -0.17  0.86407    
+## age:regionnorthwest           -3.44      30.83   -0.11  0.91112    
+## age:regionsoutheast           24.07      31.17    0.77  0.44012    
+## age:regionsouthwest           18.13      31.80    0.57  0.56867    
+## sexmale:bmi                    6.58      52.06    0.13  0.89950    
+## sexmale:children            -122.51     250.97   -0.49  0.62556    
+## sexmale:smokeryes           -400.90     763.54   -0.53  0.59966    
+## sexmale:regionnorthwest      304.00     859.07    0.35  0.72351    
+## sexmale:regionsoutheast      905.24     865.74    1.05  0.29598    
+## sexmale:regionsouthwest      192.75     865.76    0.22  0.82386    
+## bmi:children                  -1.06      21.95   -0.05  0.96164    
+## bmi:smokeryes               1556.79      63.84   24.39  &lt; 2e-16 ***
+## bmi:regionnorthwest           23.60      77.93    0.30  0.76208    
+## bmi:regionsoutheast         -154.63      68.53   -2.26  0.02424 *  
+## bmi:regionsouthwest          -70.93      75.85   -0.94  0.34996    
+## children:smokeryes          -412.83     316.33   -1.31  0.19216    
+## children:regionnorthwest     220.23     364.79    0.60  0.54615    
+## children:regionsoutheast    -352.02     366.97   -0.96  0.33765    
+## children:regionsouthwest    -571.00     350.55   -1.63  0.10365    
+## smokeryes:regionnorthwest   -669.40    1094.65   -0.61  0.54099    
+## smokeryes:regionsoutheast  -1650.58    1037.97   -1.59  0.11210    
+## smokeryes:regionsouthwest    992.52    1109.34    0.89  0.37116    
+## ---
+## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
+## 
+## Residual standard error: 4830 on 1036 degrees of freedom
+## Multiple R-squared:  0.845,  Adjusted R-squared:  0.84 
+## F-statistic:  171 on 33 and 1036 DF,  p-value: &lt;2e-16</code></pre>
 <p>Then, we do the BP test and the shapiro test for this model. We find that the p-value for BP test is very large; much greater than 0.1. Thus, the constant variance assumption for this model is NOT violated. However, the shapiro test has a p-value very close to 0. Thus, the normality assumption for this model is violated.</p>
-<pre class="r"><code>library(lmtest)
-bptest(full_interaction)$p.value</code></pre>
+<pre class="r"><code>bptest(full_interaction)$p.value</code></pre>
 <pre><code>##     BP 
-## 0.8264</code></pre>
+## 0.7676</code></pre>
 <pre class="r"><code>shapiro.test(resid(full_interaction))$p.value</code></pre>
-<pre><code>## [1] 2.694e-44</code></pre>
-<p>The following observations are those we believe influential (have Cook’s Distance is greater than 4/n, where n is the total number of observations). There are 1337 observations and 110 of which are influential. The rate is 6.9559%.</p>
-<pre class="r"><code>sum(cooks.distance(full_interaction) &gt; 4 / length(cooks.distance(full_interaction)))</code></pre>
-<pre><code>## [1] 93</code></pre>
-<pre class="r"><code>full_inter_influential_table = knitr::kable(insuranceData[cooks.distance(full_interaction) &gt; 4 / length(cooks.distance(full_interaction)),])
+<pre><code>## [1] 7.915e-41</code></pre>
+<pre class="r"><code>(num_influential = sum(cooks.distance(full_interaction) &gt; 4 / length(cooks.distance(full_interaction))))</code></pre>
+<pre><code>## [1] 78</code></pre>
+<p>The following observations are those we believe influential (have Cook’s Distance is greater than 4/n, where n is the total number of observations). There are 1337 observations and 78 of which are influential. The rate is 5.834%.</p>
+<pre class="r"><code>full_inter_influential_table = knitr::kable(trainSet[cooks.distance(full_interaction) &gt; 4 / length(cooks.distance(full_interaction)),])
 head(full_inter_influential_table, 10)</code></pre>
 <pre><code>##  [1] &quot;        age  sex         bmi   children  smoker   region       charges&quot;
 ##  [2] &quot;-----  ----  -------  ------  ---------  -------  ----------  --------&quot;
-##  [3] &quot;4        33  male      22.70          0  no       northwest      21984&quot;
-##  [4] &quot;10       60  female    25.84          0  no       northwest      28923&quot;
-##  [5] &quot;35       28  male      36.40          1  yes      southwest      51195&quot;
-##  [6] &quot;63       64  male      24.70          1  no       northwest      30167&quot;
-##  [7] &quot;93       59  male      29.83          3  yes      northeast      30185&quot;
-##  [8] &quot;95       64  female    31.30          2  yes      southwest      47291&quot;
-##  [9] &quot;103      18  female    30.11          0  no       northeast      21345&quot;
-## [10] &quot;116      60  male      28.59          0  no       northeast      30260&quot;</code></pre>
-<p>we perform variable selection using backwards AIC. The resulting model is denoted as <code>interaction_aic</code></p>
+##  [3] &quot;293      25  male      45.54          2  yes      southeast      42112&quot;
+##  [4] &quot;1157     19  male      44.88          0  yes      southeast      39723&quot;
+##  [5] &quot;960      48  male      36.67          1  no       northwest      28469&quot;
+##  [6] &quot;40       60  male      39.90          0  yes      southwest      48173&quot;
+##  [7] &quot;1329     23  female    24.23          2  no       northeast      22396&quot;
+##  [8] &quot;251      18  male      17.29          2  yes      northeast      12829&quot;
+##  [9] &quot;504      19  male      30.25          0  yes      southeast      32548&quot;
+## [10] &quot;1302     62  male      30.88          3  yes      northwest      46718&quot;</code></pre>
+<p>We perform variable selection using backwards AIC. The resulting model is denoted as <code>interaction_aic</code></p>
 <pre class="r"><code>n = length(resid(full_interaction))
 interaction_aic = step(full_interaction, direction = &quot;backward&quot;, trace = 0)</code></pre>
-<p>We perform ANOVA test for <code>interaction_aic</code> model and <code>full_interaction</code> model. We find that the p-value is 0.549 &gt; 0.1, thus we prefer the <code>interaction_aic</code> model.</p>
+<p>We perform ANOVA test for <code>interaction_aic</code> model and <code>full_interaction</code> model. We find that the p-value is 0.7163 &gt; 0.1, thus we prefer the <code>interaction_aic</code> model.</p>
 <pre class="r"><code>anova(interaction_aic,full_interaction)</code></pre>
 <pre><code>## Analysis of Variance Table
 ## 
-## Model 1: charges ~ age + sex + bmi + children + smoker + region + bmi:smoker + 
-##     bmi:region
+## Model 1: charges ~ age + bmi + children + smoker + region + bmi:smoker + 
+##     bmi:region + children:region
 ## Model 2: charges ~ (age + sex + bmi + children + smoker + region)^2
 ##   Res.Df      RSS Df Sum of Sq    F Pr(&gt;F)
-## 1   1325 3.09e+10                         
-## 2   1304 3.05e+10 21 457451556 0.93   0.55</code></pre>
+## 1   1055 2.45e+10                         
+## 2   1036 2.42e+10 19 352312956 0.79   0.72</code></pre>
 </div>
 <div id="polynomial-model" class="section level4">
 <h4>Polynomial Model</h4>
 <p>First we start with a model containing the first and second order of every variable.</p>
-<pre class="r"><code>full_polynomail = lm(charges~ . +I(age^2) +I(bmi^2) +I(children^2), data = insuranceData)</code></pre>
+<pre class="r"><code>full_polynomial = lm(charges~ . +I(age^2) +I(bmi^2) +I(children^2), data = trainSet)
+summary(full_polynomial)</code></pre>
+<pre><code>## 
+## Call:
+## lm(formula = charges ~ . + I(age^2) + I(bmi^2) + I(children^2), 
+##     data = trainSet)
+## 
+## Residuals:
+##    Min     1Q Median     3Q    Max 
+## -10755  -3146  -1258   1665  30695 
+## 
+## Coefficients:
+##                  Estimate Std. Error t value Pr(&gt;|t|)    
+## (Intercept)     -16258.51    3965.73   -4.10 0.000045 ***
+## age                -57.11      93.40   -0.61  0.54107    
+## sexmale             68.30     374.06    0.18  0.85516    
+## bmi                967.75     236.07    4.10 0.000045 ***
+## children           960.67     416.19    2.31  0.02118 *  
+## smokeryes        23767.26     464.04   51.22  &lt; 2e-16 ***
+## regionnorthwest     56.65     537.75    0.11  0.91611    
+## regionsoutheast  -1090.10     540.51   -2.02  0.04397 *  
+## regionsouthwest   -980.28     539.04   -1.82  0.06926 .  
+## I(age^2)             3.87       1.16    3.32  0.00092 ***
+## I(bmi^2)           -10.01       3.72   -2.69  0.00724 ** 
+## I(children^2)     -104.60     112.82   -0.93  0.35409    
+## ---
+## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
+## 
+## Residual standard error: 6080 on 1058 degrees of freedom
+## Multiple R-squared:  0.749,  Adjusted R-squared:  0.746 
+## F-statistic:  287 on 11 and 1058 DF,  p-value: &lt;2e-16</code></pre>
 <p>Then, we perform the BP test and the shapiro test for this model. We find that the p-values for both tests are very close to zero, and thus, the constant variance assumption and the normality assumption for this model are violated.</p>
-<pre class="r"><code>library(lmtest)
-bptest(full_polynomail)$p.value</code></pre>
-<pre><code>##       BP 
-## 2.25e-22</code></pre>
-<pre class="r"><code>shapiro.test(resid(full_polynomail))$p.value</code></pre>
-<pre><code>## [1] 3.665e-29</code></pre>
-<p>The following observations are those we believe influential (have Cook’s Distance is greater than 4/n, where n is the total number of observations). There are 1337 observations and 81 of which are influential. The rate is 6.9559%.</p>
-<pre class="r"><code>sum(cooks.distance(full_polynomail) &gt; 4 / length(cooks.distance(full_polynomail)))</code></pre>
-<pre><code>## [1] 81</code></pre>
-<pre class="r"><code>full_poly_influential_table = knitr::kable(insuranceData[cooks.distance(full_polynomail) &gt; 4 / length(cooks.distance(full_polynomail)),])
+<pre class="r"><code>bptest(full_polynomial)$p.value</code></pre>
+<pre><code>##        BP 
+## 2.453e-17</code></pre>
+<pre class="r"><code>shapiro.test(resid(full_polynomial))$p.value</code></pre>
+<pre><code>## [1] 4.944e-27</code></pre>
+<pre class="r"><code>(num_influential = sum(cooks.distance(full_polynomial) &gt; 4 / length(cooks.distance(full_polynomial))))</code></pre>
+<pre><code>## [1] 59</code></pre>
+<p>The following observations are those we believe influential (have Cook’s Distance is greater than 4/n, where n is the total number of observations). There are 1337 observations and 59 of which are influential. The rate is 4.4129%.</p>
+<pre class="r"><code>full_poly_influential_table = knitr::kable(trainSet[cooks.distance(full_polynomial) &gt; 4 / length(cooks.distance(full_polynomial)),])
 head(full_poly_influential_table, 10)</code></pre>
 <pre><code>##  [1] &quot;        age  sex         bmi   children  smoker   region       charges&quot;
 ##  [2] &quot;-----  ----  -------  ------  ---------  -------  ----------  --------&quot;
-##  [3] &quot;4        33  male      22.70          0  no       northwest      21984&quot;
-##  [4] &quot;10       60  female    25.84          0  no       northwest      28923&quot;
-##  [5] &quot;35       28  male      36.40          1  yes      southwest      51195&quot;
-##  [6] &quot;63       64  male      24.70          1  no       northwest      30167&quot;
-##  [7] &quot;99       56  male      19.95          0  yes      northeast      22413&quot;
-##  [8] &quot;100      38  male      19.30          0  yes      southwest      15821&quot;
-##  [9] &quot;103      18  female    30.11          0  no       northeast      21345&quot;
-## [10] &quot;116      60  male      28.59          0  no       northeast      30260&quot;</code></pre>
+##  [3] &quot;293      25  male      45.54          2  yes      southeast      42112&quot;
+##  [4] &quot;1157     19  male      44.88          0  yes      southeast      39723&quot;
+##  [5] &quot;960      48  male      36.67          1  no       northwest      28469&quot;
+##  [6] &quot;1329     23  female    24.23          2  no       northeast      22396&quot;
+##  [7] &quot;381      27  female    17.95          2  yes      northeast      15007&quot;
+##  [8] &quot;251      18  male      17.29          2  yes      northeast      12829&quot;
+##  [9] &quot;877      49  female    27.10          1  no       southwest      26140&quot;
+## [10] &quot;1028     23  male      18.71          0  no       northwest      21595&quot;</code></pre>
+</div>
+<div id="combined-model" class="section level4">
+<h4>Combined Model</h4>
+<pre class="r"><code>#add an additional column, which will be used for combined model, explanations will be provided later
+trainSet$bmi30 = ifelse(trainSet$bmi &gt;= 30, &quot;yes&quot;, &quot;no&quot;)
+combined_model = lm(charges ~ age + I(age^2) + children + bmi + sex + bmi30 * smoker + region, data=trainSet)
+summary(combined_model)</code></pre>
+<pre><code>## 
+## Call:
+## lm(formula = charges ~ age + I(age^2) + children + bmi + sex + 
+##     bmi30 * smoker + region, data = trainSet)
+## 
+## Residuals:
+##    Min     1Q Median     3Q    Max 
+## -17338  -1714  -1213   -605  24414 
+## 
+## Coefficients:
+##                     Estimate Std. Error t value Pr(&gt;|t|)    
+## (Intercept)         -718.178   1542.076   -0.47  0.64151    
+## age                   -4.486     67.617   -0.07  0.94711    
+## I(age^2)               3.358      0.843    3.99  7.2e-05 ***
+## children             632.772    118.429    5.34  1.1e-07 ***
+## bmi                  138.512     38.547    3.59  0.00034 ***
+## sexmale             -363.366    274.941   -1.32  0.18658    
+## bmi30yes           -1366.765    474.754   -2.88  0.00407 ** 
+## smokeryes          13103.896    492.603   26.60  &lt; 2e-16 ***
+## regionnorthwest      -28.306    393.655   -0.07  0.94269    
+## regionsoutheast    -1018.494    397.372   -2.56  0.01051 *  
+## regionsouthwest    -1315.136    395.104   -3.33  0.00090 ***
+## bmi30yes:smokeryes 20250.234    678.469   29.85  &lt; 2e-16 ***
+## ---
+## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
+## 
+## Residual standard error: 4460 on 1058 degrees of freedom
+## Multiple R-squared:  0.865,  Adjusted R-squared:  0.863 
+## F-statistic:  614 on 11 and 1058 DF,  p-value: &lt;2e-16</code></pre>
+<p>Then, we perform the BP test and the shapiro test for this model. We find that the p-values for shapiro test is very close to zero, and thus, the normality assumption for this model are violated.</p>
+<pre class="r"><code>bptest(combined_model)$p.value</code></pre>
+<pre><code>##     BP 
+## 0.6836</code></pre>
+<pre class="r"><code>shapiro.test(resid(combined_model))$p.value</code></pre>
+<pre><code>## [1] 6.802e-48</code></pre>
 <hr />
 </div>
 </div>
@@ -533,41 +679,43 @@ head(full_poly_influential_table, 10)</code></pre>
 <pre><code>## Analysis of Variance Table
 ## 
 ## Model 1: charges ~ age + sex + bmi + children + smoker + region
-## Model 2: charges ~ age + sex + bmi + children + smoker + region + bmi:smoker + 
-##     bmi:region
+## Model 2: charges ~ age + bmi + children + smoker + region + bmi:smoker + 
+##     bmi:region + children:region
 ##   Res.Df      RSS Df Sum of Sq   F Pr(&gt;F)    
-## 1   1329 4.88e+10                            
-## 2   1325 3.09e+10  4  1.79e+10 192 &lt;2e-16 ***
+## 1   1061 3.98e+10                            
+## 2   1055 2.45e+10  6  1.52e+10 109 &lt;2e-16 ***
 ## ---
 ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1</code></pre>
-<pre class="r"><code>anova(full_polynomail, interaction_aic)</code></pre>
+<pre class="r"><code>anova(full_polynomial, interaction_aic)</code></pre>
 <pre><code>## Analysis of Variance Table
 ## 
 ## Model 1: charges ~ age + sex + bmi + children + smoker + region + I(age^2) + 
 ##     I(bmi^2) + I(children^2)
-## Model 2: charges ~ age + sex + bmi + children + smoker + region + bmi:smoker + 
-##     bmi:region
+## Model 2: charges ~ age + bmi + children + smoker + region + bmi:smoker + 
+##     bmi:region + children:region
 ##   Res.Df      RSS Df Sum of Sq   F Pr(&gt;F)    
-## 1   1326 4.80e+10                            
-## 2   1325 3.09e+10  1   1.7e+10 730 &lt;2e-16 ***
+## 1   1058 3.91e+10                            
+## 2   1055 2.45e+10  3  1.46e+10 209 &lt;2e-16 ***
 ## ---
 ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1</code></pre>
 <pre class="r"><code>summary(interaction_aic)$&quot;adj.r.squared&quot;</code></pre>
-<pre><code>## [1] 0.8408</code></pre>
+<pre><code>## [1] 0.8403</code></pre>
 <p>Since two p-values are less than 0.01, we choose <code>interaction_aic</code> model.</p>
 <hr />
 </div>
 <div id="discussion" class="section level2">
 <h2>Discussion</h2>
 <pre class="r"><code>summary(full_additive)$&quot;adj.r.squared&quot;</code></pre>
-<pre><code>## [1] 0.7494</code></pre>
-<pre class="r"><code>summary(full_polynomail)$&quot;adj.r.squared&quot;</code></pre>
-<pre><code>## [1] 0.7532</code></pre>
+<pre><code>## [1] 0.7426</code></pre>
+<pre class="r"><code>summary(full_polynomial)$&quot;adj.r.squared&quot;</code></pre>
+<pre><code>## [1] 0.7462</code></pre>
 <pre class="r"><code>summary(interaction_aic)$&quot;adj.r.squared&quot;</code></pre>
-<pre><code>## [1] 0.8408</code></pre>
-<p>For the additive model, it violates both the constant variance assumption and the normality assumption. It has an adjusted <span class="math inline">\(R^2\)</span> value of 0.7494.</p>
-<p>For the full_polynomail model, it violates both the constant variance assumption and the normality assumption. It has an adjusted <span class="math inline">\(R^2\)</span> value of 0.7532.</p>
-<p>For the interactive model, it supports the constant variance assumption but violates the normality assumption. It has an adjusted <span class="math inline">\(R^2\)</span> value 0.8408.</p>
+<pre><code>## [1] 0.8403</code></pre>
+<pre class="r"><code>summary(combined_model)$&quot;adj.r.squared&quot;</code></pre>
+<pre><code>## [1] 0.8632</code></pre>
+<p>For the additive model, it violates both the constant variance assumption and the normality assumption. It has an adjusted <span class="math inline">\(R^2\)</span> value of 0.7426.</p>
+<p>For the full_polynomail model, it violates both the constant variance assumption and the normality assumption. It has an adjusted <span class="math inline">\(R^2\)</span> value of 0.7462.</p>
+<p>For the interactive model, it supports the constant variance assumption but violates the normality assumption. It has an adjusted <span class="math inline">\(R^2\)</span> value 0.8403.</p>
 <p>We can see that the interactive model has the greatest <span class="math inline">\(R^2\)</span> value.</p>
 <pre class="r"><code>RMSE = function( model, data = NULL){
   if (is.null(data)){
@@ -577,14 +725,17 @@ head(full_poly_influential_table, 10)</code></pre>
   return(sqrt(mean((data$charges - predict_val) ^ 2)))
 }
 RMSE(full_additive, insuranceData)</code></pre>
-<pre><code>## [1] 6042</code></pre>
-<pre class="r"><code>RMSE(full_polynomail, insuranceData)</code></pre>
-<pre><code>## [1] 5989</code></pre>
+<pre><code>## [1] 6048</code></pre>
+<pre class="r"><code>RMSE(full_polynomial, insuranceData)</code></pre>
+<pre><code>## [1] 5998</code></pre>
 <pre class="r"><code>RMSE(interaction_aic, insuranceData)</code></pre>
-<pre><code>## [1] 4809</code></pre>
-<p>For the additive model, it has a RMSE value of 6041.6797.</p>
-<p>For the polynomail model, it has a RMSE value of 5988.8014.</p>
-<p>For the interactive model, it has a RMSE value of 4808.7855.</p>
+<pre><code>## [1] 4815</code></pre>
+<pre class="r"><code>insuranceData$bmi30 = ifelse(insuranceData$bmi &gt;= 30, &quot;yes&quot;, &quot;no&quot;)
+RMSE(combined_model, insuranceData)</code></pre>
+<pre><code>## [1] 4431</code></pre>
+<p>For the additive model, it has a RMSE value of 6048.3728.</p>
+<p>For the polynomail model, it has a RMSE value of 5998.0011.</p>
+<p>For the interactive model, it has a RMSE value of 4814.5098.</p>
 <p>We can see that the interactive model has the smallest RMSE value.</p>
 </div>
 
