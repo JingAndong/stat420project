@@ -361,6 +361,15 @@ table = function(aic, bic) {
   )
   colnames(results) = c(&quot;&quot;, &quot;LOOCV&quot;, &quot;Number of Parameters&quot;)
   knitr::kable(results)
+}
+
+#This function calculates the RMSE of a dataset.
+RMSE = function( model, data = NULL){
+  if (is.null(data)){
+    return (sqrt(mean((model$residuals)^2 )))
+  }
+  predict_val = predict(model, newdata = data)
+  return(sqrt(mean((data$charges - predict_val) ^ 2)))
 }</code></pre>
 </div>
 <div id="model-building" class="section level3">
@@ -632,31 +641,32 @@ head(full_poly_influential_table, 10)</code></pre>
 <h4>Combined Model</h4>
 <pre class="r"><code>#add an additional column, which will be used for combined model, explanations will be provided later
 trainSet$bmi30 = ifelse(trainSet$bmi &gt;= 30, &quot;yes&quot;, &quot;no&quot;)
-combined_model = lm(charges ~ age + I(age^2) + children + bmi + sex + bmi30 * smoker + region, data=trainSet)
+combined_model = lm(charges ~ age + I(age^2) + children + bmi + sex + bmi30:smoker + region, data=trainSet)
 summary(combined_model)</code></pre>
 <pre><code>## 
 ## Call:
 ## lm(formula = charges ~ age + I(age^2) + children + bmi + sex + 
-##     bmi30 * smoker + region, data = trainSet)
+##     bmi30:smoker + region, data = trainSet)
 ## 
 ## Residuals:
 ##    Min     1Q Median     3Q    Max 
 ## -17338  -1714  -1213   -605  24414 
 ## 
-## Coefficients:
-##                     Estimate Std. Error t value Pr(&gt;|t|)    
-## (Intercept)         -718.178   1542.076   -0.47  0.64151    
-## age                   -4.486     67.617   -0.07  0.94711    
-## I(age^2)               3.358      0.843    3.99  7.2e-05 ***
-## children             632.772    118.429    5.34  1.1e-07 ***
-## bmi                  138.512     38.547    3.59  0.00034 ***
-## sexmale             -363.366    274.941   -1.32  0.18658    
-## bmi30yes           -1366.765    474.754   -2.88  0.00407 ** 
-## smokeryes          13103.896    492.603   26.60  &lt; 2e-16 ***
-## regionnorthwest      -28.306    393.655   -0.07  0.94269    
-## regionsoutheast    -1018.494    397.372   -2.56  0.01051 *  
-## regionsouthwest    -1315.136    395.104   -3.33  0.00090 ***
-## bmi30yes:smokeryes 20250.234    678.469   29.85  &lt; 2e-16 ***
+## Coefficients: (1 not defined because of singularities)
+##                      Estimate Std. Error t value Pr(&gt;|t|)    
+## (Intercept)         31269.186   1806.756   17.31  &lt; 2e-16 ***
+## age                    -4.486     67.617   -0.07  0.94711    
+## I(age^2)                3.358      0.843    3.99  7.2e-05 ***
+## children              632.772    118.429    5.34  1.1e-07 ***
+## bmi                   138.512     38.547    3.59  0.00034 ***
+## sexmale              -363.366    274.941   -1.32  0.18658    
+## regionnorthwest       -28.306    393.655   -0.07  0.94269    
+## regionsoutheast     -1018.494    397.372   -2.56  0.01051 *  
+## regionsouthwest     -1315.136    395.104   -3.33  0.00090 ***
+## bmi30no:smokerno   -31987.364    594.770  -53.78  &lt; 2e-16 ***
+## bmi30yes:smokerno  -33354.130    469.094  -71.10  &lt; 2e-16 ***
+## bmi30no:smokeryes  -18883.469    715.659  -26.39  &lt; 2e-16 ***
+## bmi30yes:smokeryes         NA         NA      NA       NA    
 ## ---
 ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 ## 
@@ -698,45 +708,83 @@ summary(combined_model)</code></pre>
 ## 2   1055 2.45e+10  3  1.46e+10 209 &lt;2e-16 ***
 ## ---
 ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1</code></pre>
-<pre class="r"><code>summary(interaction_aic)$&quot;adj.r.squared&quot;</code></pre>
-<pre><code>## [1] 0.8403</code></pre>
-<p>Since two p-values are less than 0.01, we choose <code>interaction_aic</code> model.</p>
+<pre class="r"><code>RMSE_trn = c(RMSE(full_additive), RMSE(interaction_aic), RMSE(full_polynomial), RMSE(combined_model))
+testSet_combined = testSet
+testSet_combined$bmi30 = ifelse(testSet_combined$bmi &gt;= 30, &quot;yes&quot;, &quot;no&quot;)
+RMSE_test = c(RMSE(full_additive, testSet), RMSE(interaction_aic, testSet), RMSE(full_polynomial, testSet), RMSE(combined_model, testSet_combined))</code></pre>
+<pre><code>## Warning in predict.lm(model, newdata = data): prediction from a rank-deficient
+## fit may be misleading</code></pre>
+<pre class="r"><code>knitr::kable(data.frame(variable = c(&quot;additive&quot;, &quot;interactive&quot;, &quot;polynomial&quot;, &quot;combined&quot;), RMSE_trn, RMSE_test))</code></pre>
+<table>
+<thead>
+<tr class="header">
+<th align="left">variable</th>
+<th align="right">RMSE_trn</th>
+<th align="right">RMSE_test</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td align="left">additive</td>
+<td align="right">6099</td>
+<td align="right">5843</td>
+</tr>
+<tr class="even">
+<td align="left">interactive</td>
+<td align="right">4790</td>
+<td align="right">4912</td>
+</tr>
+<tr class="odd">
+<td align="left">polynomial</td>
+<td align="right">6047</td>
+<td align="right">5797</td>
+</tr>
+<tr class="even">
+<td align="left">combined</td>
+<td align="right">4440</td>
+<td align="right">4394</td>
+</tr>
+</tbody>
+</table>
+<pre class="r"><code>knitr::kable(data.frame(model = c(&quot;additive&quot;, &quot;interactive&quot;, &quot;polynomial&quot;, &quot;combined&quot;), &quot;adjusted R squared&quot; = c(summary(full_additive)$&quot;adj.r.squared&quot;, summary(interaction_aic)$&quot;adj.r.squared&quot;, summary(full_polynomial)$&quot;adj.r.squared&quot;, summary(combined_model)$&quot;adj.r.squared&quot;)))</code></pre>
+<table>
+<thead>
+<tr class="header">
+<th align="left">model</th>
+<th align="right">adjusted.R.squared</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td align="left">additive</td>
+<td align="right">0.7426</td>
+</tr>
+<tr class="even">
+<td align="left">interactive</td>
+<td align="right">0.8403</td>
+</tr>
+<tr class="odd">
+<td align="left">polynomial</td>
+<td align="right">0.7462</td>
+</tr>
+<tr class="even">
+<td align="left">combined</td>
+<td align="right">0.8632</td>
+</tr>
+</tbody>
+</table>
 <hr />
 </div>
 <div id="discussion" class="section level2">
 <h2>Discussion</h2>
-<pre class="r"><code>summary(full_additive)$&quot;adj.r.squared&quot;</code></pre>
-<pre><code>## [1] 0.7426</code></pre>
-<pre class="r"><code>summary(full_polynomial)$&quot;adj.r.squared&quot;</code></pre>
-<pre><code>## [1] 0.7462</code></pre>
-<pre class="r"><code>summary(interaction_aic)$&quot;adj.r.squared&quot;</code></pre>
-<pre><code>## [1] 0.8403</code></pre>
-<pre class="r"><code>summary(combined_model)$&quot;adj.r.squared&quot;</code></pre>
-<pre><code>## [1] 0.8632</code></pre>
-<p>For the additive model, it violates both the constant variance assumption and the normality assumption. It has an adjusted <span class="math inline">\(R^2\)</span> value of 0.7426.</p>
-<p>For the full_polynomail model, it violates both the constant variance assumption and the normality assumption. It has an adjusted <span class="math inline">\(R^2\)</span> value of 0.7462.</p>
-<p>For the interactive model, it supports the constant variance assumption but violates the normality assumption. It has an adjusted <span class="math inline">\(R^2\)</span> value 0.8403.</p>
-<p>We can see that the interactive model has the greatest <span class="math inline">\(R^2\)</span> value.</p>
-<pre class="r"><code>RMSE = function( model, data = NULL){
-  if (is.null(data)){
-    return (sqrt(mean((model$residuals)^2 )))
-  }
-  predict_val = predict(model, newdata = data)
-  return(sqrt(mean((data$charges - predict_val) ^ 2)))
-}
-RMSE(full_additive, insuranceData)</code></pre>
-<pre><code>## [1] 6048</code></pre>
-<pre class="r"><code>RMSE(full_polynomial, insuranceData)</code></pre>
-<pre><code>## [1] 5998</code></pre>
-<pre class="r"><code>RMSE(interaction_aic, insuranceData)</code></pre>
-<pre><code>## [1] 4815</code></pre>
-<pre class="r"><code>insuranceData$bmi30 = ifelse(insuranceData$bmi &gt;= 30, &quot;yes&quot;, &quot;no&quot;)
-RMSE(combined_model, insuranceData)</code></pre>
-<pre><code>## [1] 4431</code></pre>
-<p>For the additive model, it has a RMSE value of 6048.3728.</p>
-<p>For the polynomail model, it has a RMSE value of 5998.0011.</p>
-<p>For the interactive model, it has a RMSE value of 4814.5098.</p>
-<p>We can see that the interactive model has the smallest RMSE value.</p>
+<ul>
+<li><p>From the two ANOVA performed in <strong>Result</strong> section, two p-values are less than 0.01, meaning that we reject the null hypothesis. Thus, we can conclude that the interaction between variables are significant.</p></li>
+<li><p>From the table of adjusted <span class="math inline">\(R^2\)</span>, we find that the combined model has the greatest <span class="math inline">\(R^2\)</span> value and thus this model fits the data best.</p></li>
+<li><p>We find that only the interactive model satisfies the constant variance assumption from the B-P test, and all three models violates the normality assumption.</p></li>
+<li><p>From the table of RMSE, we find that the combined model has the smallest RMSE, for both training and testing data.</p></li>
+</ul>
+<p>For the first full_additivee model, we only utilized those given variables included in the dataset and actually got a relatively good r-squared of 0.743, which indicates that 74.3% of the variation of charges could be explained by the variables we have included. We could also observe most of the variables we included are statistically significant predictors for medical charges.</p>
+<p>For the last combined model, notice that we actually created a new variable called bmi30, which separate bmi into two categories by whether its value is above 30 or not. The reason to split by 30 is because 30 is the threshold for obesity, and we obesity is an indicator of a person’s health condition. What’s more, we also added a I(age^2) variable, because as we saw in the <em>Charge vs. Age</em> plot, the realtionship between age and charges are not only limited to linear, so we want to include I(age^2) in order to introduce some non-linearity in out model. The result is obviously better comparing to all other previous models. We get a r-squared of 0.863, which indicates that 86.3% of the variation of charges are explained by thiis combined model. What’s more, this model’s adjusted r-squared and RMSE are the lowest among the all. Therefore, we believe this is the best model.</p>
 </div>
 
 

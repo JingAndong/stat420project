@@ -135,6 +135,15 @@ table = function(aic, bic) {
   colnames(results) = c("", "LOOCV", "Number of Parameters")
   knitr::kable(results)
 }
+
+#This function calculates the RMSE of a dataset.
+RMSE = function( model, data = NULL){
+  if (is.null(data)){
+    return (sqrt(mean((model$residuals)^2 )))
+  }
+  predict_val = predict(model, newdata = data)
+  return(sqrt(mean((data$charges - predict_val) ^ 2)))
+}
 ```
 
 ### Model Building
@@ -236,7 +245,7 @@ head(full_poly_influential_table, 10)
 ```{r}
 #add an additional column, which will be used for combined model, explanations will be provided later
 trainSet$bmi30 = ifelse(trainSet$bmi >= 30, "yes", "no")
-combined_model = lm(charges ~ age + I(age^2) + children + bmi + sex + bmi30 * smoker + region, data=trainSet)
+combined_model = lm(charges ~ age + I(age^2) + children + bmi + sex + bmi30:smoker + region, data=trainSet)
 summary(combined_model)
 ```
 
@@ -253,50 +262,32 @@ shapiro.test(resid(combined_model))$p.value
 ```{r}
 anova(full_additive, interaction_aic)
 anova(full_polynomial, interaction_aic)
-summary(interaction_aic)$"adj.r.squared"
 ```
-Since two p-values are less than 0.01, we choose `interaction_aic` model.
+
+```{r}
+RMSE_trn = c(RMSE(full_additive), RMSE(interaction_aic), RMSE(full_polynomial), RMSE(combined_model))
+testSet_combined = testSet
+testSet_combined$bmi30 = ifelse(testSet_combined$bmi >= 30, "yes", "no")
+RMSE_test = c(RMSE(full_additive, testSet), RMSE(interaction_aic, testSet), RMSE(full_polynomial, testSet), RMSE(combined_model, testSet_combined))
+knitr::kable(data.frame(variable = c("additive", "interactive", "polynomial", "combined"), RMSE_trn, RMSE_test))
+```
+
+```{r}
+knitr::kable(data.frame(model = c("additive", "interactive", "polynomial", "combined"), "adjusted R squared" = c(summary(full_additive)$"adj.r.squared", summary(interaction_aic)$"adj.r.squared", summary(full_polynomial)$"adj.r.squared", summary(combined_model)$"adj.r.squared")))
+```
 
 ***
 
 ## Discussion
 
+- From the two ANOVA performed in **Result** section, two p-values are less than 0.01, meaning that we reject the null hypothesis. Thus, we can conclude that the interaction between variables are significant.
 
-```{r}
-summary(full_additive)$"adj.r.squared"
-summary(full_polynomial)$"adj.r.squared"
-summary(interaction_aic)$"adj.r.squared"
-summary(combined_model)$"adj.r.squared"
-```
-For the additive model, it violates both the constant variance assumption and the normality assumption. It has an adjusted $R^2$ value of `r summary(full_additive)$"adj.r.squared"`.
+- From the table of adjusted $R^2$, we find that the combined model has the greatest $R^2$ value and thus this model fits the data best.
 
-For the full_polynomail model, it violates both the constant variance assumption and the normality assumption. It has an adjusted $R^2$ value of `r summary(full_polynomial)$"adj.r.squared"`.
+- We find that only the interactive model satisfies the constant variance assumption from the B-P test, and all three models violates the normality assumption.
 
-For the interactive model, it supports the constant variance assumption but violates the normality assumption. It has an adjusted $R^2$ value `r summary(interaction_aic)$"adj.r.squared"`.
+- From the table of RMSE, we find that the combined model has the smallest RMSE, for both training and testing data.
 
-We can see that the interactive model has the greatest $R^2$ value.
+For the first full_additivee model, we only utilized those given variables included in the dataset and actually got a relatively good r-squared of 0.743, which indicates that 74.3% of the variation of charges could be explained by the variables we have included. We could also observe most of the variables we included are statistically significant predictors for medical charges.
 
-
-
-```{r}
-RMSE = function( model, data = NULL){
-  if (is.null(data)){
-    return (sqrt(mean((model$residuals)^2 )))
-  }
-  predict_val = predict(model, newdata = data)
-  return(sqrt(mean((data$charges - predict_val) ^ 2)))
-}
-RMSE(full_additive, insuranceData)
-RMSE(full_polynomial, insuranceData)
-RMSE(interaction_aic, insuranceData)
-insuranceData$bmi30 = ifelse(insuranceData$bmi >= 30, "yes", "no")
-RMSE(combined_model, insuranceData)
-
-```
-For the additive model, it has a RMSE value of `r RMSE(full_additive, insuranceData)`.
-
-For the polynomail model, it has a RMSE value of `r RMSE(full_polynomial, insuranceData)`.
-
-For the interactive model, it has a RMSE value of `r RMSE(interaction_aic, insuranceData)`.
-
-We can see that the interactive model has the smallest RMSE value.
+For the last combined model, notice that we actually created a new variable called bmi30, which separate bmi into two categories by whether its value is above 30 or not. The reason to split by 30 is because 30 is the threshold for obesity, and we obesity is an indicator of a person's health condition. What's more, we also added a I(age^2) variable, because as we saw in the *Charge vs. Age* plot, the realtionship between age and charges are not only limited to linear, so we want to include I(age^2) in order to introduce some non-linearity in out model. The result is obviously better comparing to all other previous models. We get a r-squared of 0.863, which indicates that 86.3% of the variation of charges are explained by thiis combined model. What's more, this model's adjusted r-squared and RMSE are the lowest among the all. Therefore, we believe this is the best model.
