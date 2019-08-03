@@ -119,9 +119,137 @@ table = function(aic, bic) {
 ```
 
 ### Develop of the model
-  
+
+
+#### Additive Model
 First we start with a full additive model as a baseline.
 ```{r}
 full_additive = lm(charges~., data = insuranceData)
-
 ```
+
+Then, we do the BP test and the shapiro test for this model. We find that the p-values for both tests are very close to zero, and thus, the constant variance assumption and the normality assumption for this model are violated.
+```{r}
+library(lmtest)
+bptest(full_additive)$p.value
+shapiro.test(resid(full_additive))$p.value
+```
+
+
+The following  observations are those we believe influential (have Cook’s Distance is greater than 4/n, where n is the total number of observations).
+```{r}
+sum(cooks.distance(full_additive) > 4 / length(cooks.distance(full_additive)))
+full_add_influential_table = knitr::kable(insuranceData[cooks.distance(full_additive) > 4 / length(cooks.distance(full_additive)),]) 
+head(full_add_influential_table, 10)
+```
+
+There are 1337 observations and 87 of which are influential. The rate is `r 87/1337*100`%.
+```{r}
+cooksD = cooks.distance(full_additive)
+full_additive_2 = lm(charges~., data = insuranceData, subset = cooksD <= 4 / length(cooksD))
+
+results = data.frame(coef(full_additive), coef(full_additive_2))
+colnames(results) = c("With Influential Pts", "Without Influential Pts")
+knitr::kable(results)
+```
+
+From the table above, we can see that most of the coefficients are influenced by the influential points, in some way but not significantly. However there are some coefficients, such as `sex:male` and `region:northwest` are significantly affected by these influential points.
+
+#### Interaction Model
+
+First we start with a full interaction model as a baseline.
+```{r}
+full_interaction = lm(charges~.^2, data = insuranceData)
+```
+
+Then, we do the BP test and the shapiro test for this model. We find that the p-value for BP test is very large; much greater than 0.1. Thus, the constant variance assumption for this model is NOT violated. However, the shapiro test has a p-value very close to 0. Thus, the normality assumption for this model is violated.
+```{r}
+library(lmtest)
+bptest(full_interaction)$p.value
+shapiro.test(resid(full_interaction))$p.value
+```
+
+
+The following observations are those we believe influential (have Cook’s Distance is greater than 4/n, where n is the total number of observations). There are 1337 observations and 110 of which are influential. The rate is `r 93/1337*100`%.
+```{r}
+sum(cooks.distance(full_interaction) > 4 / length(cooks.distance(full_interaction)))
+full_inter_influential_table = knitr::kable(insuranceData[cooks.distance(full_interaction) > 4 / length(cooks.distance(full_interaction)),])
+head(full_inter_influential_table, 10)
+```
+
+we perform variable selection using backwards AIC. The resulting model is denoted as `interaction_aic`
+```{r}
+n = length(resid(full_interaction))
+interaction_aic = step(full_interaction, direction = "backward", trace = 0)
+```
+
+We perform ANOVA  test for `interaction_aic` model and `full_interaction` model. We find that the p-value is `r anova(interaction_aic,full_interaction)[2,"Pr(>F)"]` > 0.1, thus we prefer the `interaction_aic` model.
+```{r}
+anova(interaction_aic,full_interaction)
+```
+
+#### Polynomial Model
+First we start with a model containing the first and second order of every variable.
+```{r}
+full_polynomail = lm(charges~ . +I(age^2) +I(bmi^2) +I(children^2), data = insuranceData)
+```
+
+Then, we perform the BP test and the shapiro test for this model. We find that the p-values for both tests are very close to zero, and thus, the constant variance assumption and the normality assumption for this model are violated.
+```{r}
+library(lmtest)
+bptest(full_polynomail)$p.value
+shapiro.test(resid(full_polynomail))$p.value
+```
+
+The following observations are those we believe influential (have Cook’s Distance is greater than 4/n, where n is the total number of observations). There are 1337 observations and 81 of which are influential. The rate is `r 93/1337*100`%.
+```{r}
+sum(cooks.distance(full_polynomail) > 4 / length(cooks.distance(full_polynomail)))
+full_poly_influential_table = knitr::kable(insuranceData[cooks.distance(full_polynomail) > 4 / length(cooks.distance(full_polynomail)),])
+head(full_poly_influential_table, 10)
+```
+
+
+## Result
+```{r}
+anova(full_additive, interaction_aic)
+anova(full_polynomail, interaction_aic)
+summary(interaction_aic)$"adj.r.squared"
+```
+Since two p-values are less than 0.01, we choose `interaction_aic` model.
+
+## Discussion
+
+
+```{r}
+summary(full_additive)$"adj.r.squared"
+summary(full_polynomail)$"adj.r.squared"
+summary(interaction_aic)$"adj.r.squared"
+```
+For the additive model, it violates both the constant variance assumption and the normality assumption. It has an adjusted $R^2$ value of `r summary(full_additive)$"adj.r.squared"`.
+
+For the full_polynomail model, it violates both the constant variance assumption and the normality assumption. It has an adjusted $R^2$ value of `r summary(full_polynomail)$"adj.r.squared"`.
+
+For the interactive model, it supports the constant variance assumption but violates the normality assumption. It has an adjusted $R^2$ value `r summary(interaction_aic)$"adj.r.squared"`.
+
+We can see that the interactive model has the greatest $R^2$ value.
+
+
+
+```{r}
+RMSE = function( model, data = NULL){
+  if (is.null(data)){
+    return (sqrt(mean((model$residuals)^2 )))
+  }
+  predict_val = predict(model, newdata = data)
+  return(sqrt(mean((data$charges - predict_val) ^ 2)))
+}
+RMSE(full_additive, insuranceData)
+RMSE(full_polynomail, insuranceData)
+RMSE(interaction_aic, insuranceData)
+```
+For the additive model, it has a RMSE value of `r RMSE(full_additive, insuranceData)`.
+
+For the polynomail model, it has a RMSE value of `r RMSE(full_polynomail, insuranceData)`.
+
+For the interactive model, it has a RMSE value of `r RMSE(interaction_aic, insuranceData)`.
+
+We can see that the interactive model has the smallest RMSE value.
